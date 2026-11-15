@@ -786,9 +786,13 @@ def test_fonts_are_the_vendored_ones(page: Page):
     """
     page.goto("/")
     page.locator(".square").first.wait_for()
-    page.evaluate("document.fonts.ready")
-    assert page.evaluate("document.fonts.check('16px \"Familjen Grotesk\"')")
-    assert page.evaluate("document.fonts.check('16px \"JetBrains Mono\"')")
+    # fonts.ready can resolve before a font starts loading, so ask for each one.
+    for family in ("Familjen Grotesk", "JetBrains Mono"):
+        loaded = page.evaluate(
+            'async (family) => (await document.fonts.load(`16px "${family}"`)).length', family
+        )
+        assert loaded > 0, family
+        assert page.evaluate('(family) => document.fonts.check(`16px "${family}"`)', family)
 
 
 def test_logo_is_in_the_header_and_the_browser_tab(page: Page):
