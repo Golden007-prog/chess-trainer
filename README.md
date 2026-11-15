@@ -209,7 +209,7 @@ en una imagen Docker. Funciona en tu máquina (amd64 o arm64), sin cuenta y sin 
 para jugar.
 
 Las traducciones a idiomas distintos del inglés, el portugués y el español son automáticas y no se
-han revisado. Para sugerir una corrección, abre una [incidencia de corrección de traducción](https://github.com/nielsencampos/chess-trainer/issues/new?template=translation-fix.yml).
+han revisado. Para sugerir una corrección, abre un [issue de corrección de traducción](https://github.com/nielsencampos/chess-trainer/issues/new?template=translation-fix.yml).
 
 **Para ejecutarlo**, con Docker y Compose instalados:
 

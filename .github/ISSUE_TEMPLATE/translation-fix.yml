@@ -1,6 +1,7 @@
 name: Translation fix
 description: Suggest a correction to a translation or opening name.
 title: "Translation fix: "
+labels: ["i18n"]
 body:
   - type: input
     id: language
