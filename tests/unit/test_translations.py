@@ -18,6 +18,7 @@ from catalog.translations import (
     name_origins,
     name_source_problems,
 )
+from catalog.validate import translation_report
 
 BOOK = read_opening_files(Path(__file__).parent.parent.parent / "openings")
 WIKI = "https://pt.wikipedia.org/wiki/Xeque"
@@ -264,3 +265,20 @@ def test_a_bad_name_entry_fails(tmp_path, text):
     """
     with pytest.raises(TranslationError):
         load_name_sources(write(tmp_path / "pt-BR.toml", text))
+
+
+def test_validate_reports_the_origins_per_locale(tmp_path):
+    """catalog.validate has a line per locale, and an INVALID line for a bad name-source file.
+
+    Args:
+        tmp_path (Path): A temporary folder, as i18n/names.
+    """
+    report = translation_report(BOOK, tmp_path)
+    others = [code for code in load_locales() if code != DEFAULT_LOCALE]
+    assert [line.split(":")[0] for line in report] == [f"sources {code}" for code in others]
+    assert all("unrecorded" in line for line in report)
+    write(tmp_path / "pt-BR.toml", '[families.no-such-family]\nname = "X"\nmachine = true\n')
+    assert any(
+        line.startswith("INVALID") and "no-such-family" in line
+        for line in translation_report(BOOK, tmp_path)
+    )
