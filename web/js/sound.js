@@ -1,106 +1,69 @@
-// Sounds generated in the browser with Web Audio: no files, no licenses, works offline.
+// The app's sounds: recordings by the project's author in web/sounds/, played with Web Audio.
 // The browser only allows audio after a user gesture, so nothing plays before the first click.
 
 import { onLocaleChange, t } from "./i18n.js";
 import { getPref, setPref } from "./prefs.js";
 
+/** @typedef {"move" | "capture" | "castle" | "check" | "clock" | "start" | "end"} SoundType */
+
+/** @type {SoundType[]} */
+export const SOUND_TYPES = ["move", "capture", "castle", "check", "clock", "start", "end"];
+
 const DEFAULT_VOLUME = 0.7;
-const BOT_PITCH = 0.85;
-const END_DELAY_S = 0.18;
+// A bot move plays a little slower, so it sounds slightly lower.
+const BOT_RATE = 0.94;
+// The end comes after the last move's sound, and the clock is pressed just after the move.
+const END_DELAY_S = 0.2;
+const CLOCK_DELAY_S = 0.25;
 
 /**
- * A random factor around 1, so repeated sounds are not identical.
- * @param {number} amount  The most it can differ from 1, such as 0.04.
- * @returns {number} The factor.
+ * Fetches and decodes every sound file.
+ * @param {BaseAudioContext} context  Decodes the files. An AudioBuffer plays in any context.
+ * @returns {Promise<Map<SoundType, AudioBuffer>>} Each type's sound; a file that fails is left out.
  */
-const jitter = (amount) => 1 + (Math.random() * 2 - 1) * amount;
-
-/**
- * One knock of wood: a short bright click over a body that falls quickly in pitch.
- * @param {BaseAudioContext} context  The audio context.
- * @param {AudioNode} output  Where the sound goes.
- * @param {number} time  When it starts, in the context's seconds.
- * @param {{pitch: number, level: number, decay?: number}} knock  Its pitch in Hz, its level,
- *   and how long it rings, in seconds.
- * @returns {void}
- */
-function knock(context, output, time, { pitch, level, decay = 0.08 }) {
-  const frequency = pitch * jitter(0.04);
-  const volume = level * jitter(0.1);
-
-  const body = context.createOscillator();
-  body.type = "triangle";
-  body.frequency.setValueAtTime(frequency, time);
-  body.frequency.exponentialRampToValueAtTime(frequency * 0.7, time + decay);
-  const bodyGain = context.createGain();
-  bodyGain.gain.setValueAtTime(volume, time);
-  bodyGain.gain.exponentialRampToValueAtTime(0.001, time + decay);
-  body.connect(bodyGain).connect(output);
-  body.start(time);
-  body.stop(time + decay);
-
-  // A higher mode of the wood, which dies sooner.
-  const mode = context.createOscillator();
-  mode.type = "sine";
-  mode.frequency.setValueAtTime(frequency * 2.6, time);
-  const modeGain = context.createGain();
-  modeGain.gain.setValueAtTime(volume * 0.35, time);
-  modeGain.gain.exponentialRampToValueAtTime(0.001, time + decay * 0.45);
-  mode.connect(modeGain).connect(output);
-  mode.start(time);
-  mode.stop(time + decay * 0.45);
-
-  // The click of the contact.
-  const length = Math.floor(context.sampleRate * 0.02);
-  const buffer = context.createBuffer(1, length, context.sampleRate);
-  const samples = buffer.getChannelData(0);
-  for (let index = 0; index < length; index += 1) samples[index] = Math.random() * 2 - 1;
-  const noise = context.createBufferSource();
-  noise.buffer = buffer;
-  const filter = context.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.frequency.value = 2600;
-  const noiseGain = context.createGain();
-  noiseGain.gain.setValueAtTime(volume * 0.5, time);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
-  noise.connect(filter).connect(noiseGain).connect(output);
-  noise.start(time);
+export async function loadSounds(context) {
+  const buffers = new Map();
+  await Promise.all(
+    SOUND_TYPES.map(async (type) => {
+      try {
+        const response = await fetch(new URL(`../sounds/${type}.wav`, import.meta.url));
+        if (!response.ok) return;
+        buffers.set(type, await context.decodeAudioData(await response.arrayBuffer()));
+      } catch {
+        // Without that file the event is silent; the game goes on.
+      }
+    }),
+  );
+  return buffers;
 }
 
 /**
  * Schedules a sound. Separate from the player so it can be rendered without speakers.
  * @param {BaseAudioContext} context  The audio context.
  * @param {AudioNode} output  Where the sound goes.
- * @param {"move" | "capture" | "castle" | "start" | "end"} type  The event.
+ * @param {AudioBuffer} buffer  The sound.
  * @param {number} time  When it starts, in the context's seconds.
  * @param {boolean} [byBot]  A bot move sounds slightly lower.
  * @returns {void}
  */
-export function scheduleSound(context, output, type, time, byBot = false) {
-  const shift = byBot ? BOT_PITCH : 1;
-  switch (type) {
-    case "move":
-      knock(context, output, time, { pitch: 520 * shift, level: 0.7 });
-      break;
-    case "capture":
-      knock(context, output, time, { pitch: 290 * shift, level: 1, decay: 0.11 });
-      knock(context, output, time + 0.07, { pitch: 450 * shift, level: 0.3, decay: 0.05 });
-      break;
-    case "castle":
-      knock(context, output, time, { pitch: 500 * shift, level: 0.6 });
-      knock(context, output, time + 0.12, { pitch: 430 * shift, level: 0.6 });
-      break;
-    case "start":
-      knock(context, output, time, { pitch: 480, level: 0.45, decay: 0.12 });
-      knock(context, output, time + 0.15, { pitch: 660, level: 0.45, decay: 0.14 });
-      break;
-    case "end":
-      knock(context, output, time + END_DELAY_S, { pitch: 660, level: 0.45, decay: 0.12 });
-      knock(context, output, time + END_DELAY_S + 0.17, { pitch: 440, level: 0.45, decay: 0.18 });
-      break;
-    default:
-      break;
-  }
+export function scheduleSound(context, output, buffer, time, byBot = false) {
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.playbackRate.value = byBot ? BOT_RATE : 1;
+  source.connect(output);
+  source.start(time);
+}
+
+/**
+ * The sound of a move, from its SAN: castling, then capture, then check, else a plain move.
+ * @param {string} san  The move in SAN.
+ * @returns {SoundType} The sound to play.
+ */
+export function moveSound(san) {
+  if (san.startsWith("O-O")) return "castle";
+  if (san.includes("x")) return "capture";
+  if (/[+#]$/.test(san)) return "check";
+  return "move";
 }
 
 /** Plays the app's sounds, once the browser allows audio, at the stored volume. */
@@ -114,6 +77,12 @@ class SoundPlayer {
     this.context = null;
     /** @type {GainNode | null} */
     this.master = null;
+    /** @type {Map<SoundType, AudioBuffer>} */
+    this.buffers = new Map();
+    /** @type {Promise<void> | null} */
+    this.loading = null;
+    // Decoding needs no gesture in an offline context, so the files are ready for the first move.
+    if (typeof OfflineAudioContext !== "undefined") this.load(new OfflineAudioContext(1, 1, 44100));
     this.unlocked = false;
     /** Allows audio after the first user gesture, then stops listening. */
     const unlock = () => {
@@ -124,6 +93,17 @@ class SoundPlayer {
     };
     document.addEventListener("pointerdown", unlock, true);
     document.addEventListener("keydown", unlock, true);
+  }
+
+  /**
+   * Starts loading the sound files, once.
+   * @param {BaseAudioContext} context  Decodes them.
+   * @returns {void}
+   */
+  load(context) {
+    this.loading ??= loadSounds(context).then((buffers) => {
+      this.buffers = buffers;
+    });
   }
 
   /**
@@ -138,6 +118,7 @@ class SoundPlayer {
       this.master = this.context.createGain();
       this.master.gain.value = this.volume;
       this.master.connect(this.context.destination);
+      this.load(this.context);
     }
     if (this.context.state === "suspended") void this.context.resume();
     return true;
@@ -145,26 +126,35 @@ class SoundPlayer {
 
   /**
    * Plays a sound if sound is on and audio is unlocked, and tells test hooks about it.
-   * @param {"move" | "capture" | "castle" | "start" | "end"} type  The event.
-   * @param {boolean} [byBot]  A bot move sounds slightly lower.
+   * @param {SoundType} type  The event.
+   * @param {{byBot?: boolean, delay?: number}} [options]  A bot move sounds slightly lower;
+   *   `delay` is in seconds from now.
    * @returns {void}
    */
-  play(type, byBot = false) {
+  play(type, { byBot = false, delay = 0 } = {}) {
     if (!this.enabled || !this.unlocked || !this.ready()) return;
-    scheduleSound(this.context, this.master, type, this.context.currentTime, byBot);
+    const context = /** @type {AudioContext} */ (this.context);
+    const at = context.currentTime + (type === "end" ? END_DELAY_S : delay);
+    const start = () => {
+      const buffer = this.buffers.get(type);
+      if (buffer) scheduleSound(context, /** @type {GainNode} */ (this.master), buffer, at, byBot);
+    };
+    // Before the files are decoded, the sound plays as soon as they are, if still in time.
+    if (this.buffers.has(type)) start();
+    else void this.loading?.then(start);
     document.dispatchEvent(new CustomEvent("chess-trainer:sound", { detail: { type, byBot } }));
   }
 
   /**
-   * Plays the sound of a move: castling, capture or a plain move.
-   * @param {import("./rules.js").PlayedMove} move  The move played.
-   * @param {boolean} byBot  Whether the bot played it.
+   * Plays the sound of a move, and the clock being pressed after it in a timed game.
+   * @param {string} san  The move in SAN.
+   * @param {{byBot?: boolean, clock?: boolean}} [options]  Whether the bot played it, and
+   *   whether a clock is pressed after it.
    * @returns {void}
    */
-  playMove(move, byBot) {
-    if (move.castle) this.play("castle", byBot);
-    else if (move.capture) this.play("capture", byBot);
-    else this.play("move", byBot);
+  playMove(san, { byBot = false, clock = false } = {}) {
+    this.play(moveSound(san), { byBot });
+    if (clock) this.play("clock", { byBot, delay: CLOCK_DELAY_S });
   }
 
   /**
@@ -191,6 +181,7 @@ class SoundPlayer {
 
 /** The app's one sound player. */
 export const sound = new SoundPlayer();
+
 
 /**
  * Wires the sound button and the volume slider.

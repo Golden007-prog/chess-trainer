@@ -366,7 +366,7 @@ export class GameController {
     this.clocks.press(this.userColor);
     const userClockMs = this.clocks.remainingMs(this.userColor);
     const botClockMs = this.clocks.remainingMs(botColor);
-    sound.playMove(move, false);
+    sound.playMove(move.san, { clock: this.clocks.enabled });
     this.plies.push({ san: move.san, uci: move.uci, outOfTheory: !this.inTheory, deviation: false });
     this.showPosition([from, to]);
     const gameEndedLocally = this.rules.isGameOver();
@@ -438,7 +438,8 @@ export class GameController {
     const botColor = this.userColor === "w" ? "b" : "w";
     this.takeBackable = null;
     this.renderTakeBack();
-    sound.playMove(this.rules.moveSan(botMove.san), true);
+    const played = this.rules.moveSan(botMove.san);
+    sound.playMove(played.san, { byBot: true, clock: this.clocks.enabled });
     this.clocks.press(botColor);
     this.plies.push({
       san: botMove.san,

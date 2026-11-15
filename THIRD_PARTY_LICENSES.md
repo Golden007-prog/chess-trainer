@@ -3,6 +3,9 @@
 chess-trainer is licensed under GPL-3.0-only (see [LICENSE](LICENSE)). It ships or downloads the
 components below. Each keeps its own license and copyright.
 
+The sounds in `web/sounds/` are not third-party: the project's author recorded them for this
+project, and they are under GPL-3.0-only like the rest of it.
+
 | Component | Where | Version / source | License | Copyright |
 |---|---|---|---|---|
 | Stockfish | Downloaded into the image at build time (`/opt/stockfish`, with its `Copying.txt` and `AUTHORS`) | Official releases; source at <https://github.com/official-stockfish/Stockfish> | GPL-3.0 | The Stockfish developers |

@@ -150,7 +150,7 @@ export class Board {
     this.render();
   }
 
-  /** Creates the 64 squares in the current orientation, with coordinates on the edge. */
+  /** Creates the 64 squares in the current orientation, with coordinates on all four sides. */
   buildSquares() {
     this.root.querySelectorAll(".square").forEach((element) => element.remove());
     this.squares.clear();
@@ -166,6 +166,8 @@ export class Board {
         element.dataset.square = name;
         if (column === 0) element.append(this.coordinate(String(rank), "coord-rank"));
         if (row === 7) element.append(this.coordinate(file, "coord-file"));
+        if (column === 7) element.append(this.coordinate(String(rank), "coord-rank-far"));
+        if (row === 0) element.append(this.coordinate(file, "coord-file-far"));
         this.squares.set(name, element);
         fragment.append(element);
       });
@@ -176,7 +178,8 @@ export class Board {
   /**
    * A coordinate label.
    * @param {string} text  The file letter or rank number.
-   * @param {string} className  `coord-file` or `coord-rank`.
+   * @param {string} className  `coord-file` or `coord-rank` (bottom and left), or the same with
+   *   `-far` (top and right).
    * @returns {HTMLSpanElement} The label.
    */
   coordinate(text, className) {

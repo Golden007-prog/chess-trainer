@@ -56,8 +56,8 @@ It started as a personal single-file HTML prototype. This project rebuilds it fr
 - "Show moves" checkbox in the right bar, shown only while a game is played, on by default and kept per browser: unchecked hides the opening name and the move list, headings included, during the game (to write moves on paper, or to play without hints), in every time control, and it can be toggled at any moment, mid-game included. Everything shows again at the end of the game. Out-of-theory warning (its own setup option), auto-play next game.
 - End of game: under the move list, the result, variation, how far theory went, deviations, and copy or download the PGN. The board keeps the final position and the left column shows the menu again, with no item active: any of them leaves the game, and New Game starts the next one with the last choices.
 - Green/cream board (a1 is dark), Merida SVG pieces (the only set), light and dark theme, click **and** drag to move.
-- Board flips to the user's color. Coordinates on the left file and bottom rank. Highlights: last move, selected square, legal targets (dot; ring for captures), king in check.
-- Sounds generated in the browser, with no audio files: start, end, move, capture and castling (two knocks). The bot's moves sound slightly lower. An on/off button and a volume control are kept per browser. There is no low-time warning, as in a real game.
+- Board flips to the user's color. The board sits in a wooden frame (`--board-frame`, the same in both themes), and the coordinates are on the frame, on all four sides, in cream, with the files in capitals. Highlights: last move, selected square, legal targets (dot; ring for captures), king in check.
+- Sounds recorded by the author (`web/sounds/*.wav`, GPL-3.0 like the rest of the project), played with Web Audio: start, end, move, capture, castling, check and the clock being pressed. A move plays one sound, in this order: castling, capture, check, else a plain move. The clock sounds after each move only in a timed game. The bot's sounds play at 94% speed, so slightly lower. Moving through a review plays each move's sound, with no clock; opening it is silent. An on/off button and a volume control are kept per browser. There is no low-time warning, as in a real game.
 - Promotion picker (Q/R/B/N) as an overlay on the board.
 - Premove: while the bot thinks, one move can be queued. It plays as soon as the bot replies if it is legal, and is dropped otherwise. It promotes to a queen. Clicking elsewhere or right-clicking cancels it, and an option in the setup turns it off.
 - Resign needs a second click to confirm (no browser dialogs).
@@ -306,7 +306,7 @@ Rules:
 3. **Engine on the server** (done): native Stockfish. The levels in `app/engine/levels.toml` stay uncalibrated (see 1.0.0 below).
 4. **Languages** (done): en, pt-BR and es, language picker.
 5. **Desktop app** (proof of concept on Linux done; CI builds for Linux, Windows and macOS, the draft Release on a tag and `HOW_TO_INSTALL*.md` in the three languages written): signing later.
-6. **1.0.0** (scope decided 2026-11-10): recorded sounds, provided by the author, in place of the generated ones; then the complete review of §10. Not planned, and kept as they are: starting a new game from a saved Chess960 game, measuring the bot levels, and a chess player's review of the pt-BR and es opening names.
+6. **1.0.0** (scope decided 2026-11-10): recorded sounds, provided by the author, in place of the generated ones (done 2026-11-15); then the complete review of §10. Not planned, and kept as they are: starting a new game from a saved Chess960 game, measuring the bot levels, and a chess player's review of the pt-BR and es opening names.
 7. **Backlog:** opening-only drill mode, PDF report with diagrams. Take-back and sounds are built.
 
 ## 13. Working rules

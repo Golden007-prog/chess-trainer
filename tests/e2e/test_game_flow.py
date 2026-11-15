@@ -8,11 +8,13 @@ from playwright.sync_api import Page, expect
 
 from tests.e2e.conftest import (
     BASE_URL,
+    RECORD_SOUNDS,
     choose_new_game_mode,
     click_move,
     drag_move,
     moves_text,
     play,
+    sounds,
     square,
     wait_for_ply,
     wait_for_your_move,
@@ -731,6 +733,27 @@ def test_review_a_saved_game_with_buttons_keys_and_clicks(page: Page):
     expect(page.locator("#review-bar")).to_be_hidden()
     assert moves_text(page) == []
     expect(page.locator(".square").first).to_have_attribute("data-square", "a8")
+
+
+def test_moving_through_a_review_plays_the_moves_sounds(page: Page):
+    """Moving through a review plays the moves' sounds, with no clock.
+
+    Args:
+        page (Page): A fresh page at 1280x720; an uncaught page error fails the test.
+    """
+    page.add_init_script(RECORD_SOUNDS)
+    page.goto("/")
+    open_review(page)
+    expect_ply(page, 5, 5)
+    page.evaluate("window.sounds = []")  # opening the review is silent
+    page.keyboard.press("ArrowLeft")
+    expect_ply(page, 4, 5)
+    page.locator("#review-flip").click()
+    page.locator('#movelist .move[data-ply="5"]').click()
+    expect_ply(page, 5, 5)
+    page.keyboard.press("Home")
+    expect_ply(page, 0, 5)
+    assert sounds(page) == ["move", "move"]
 
 
 def test_pieces_cannot_be_moved_in_a_review(page: Page):
