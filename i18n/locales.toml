@@ -1,0 +1,32 @@
+# The locale registry (brief §8): what differs per UI language, as parameters. Every
+# web/i18n/{locale}.json has one table here, and every table has its file (tests/unit/test_locales.py).
+# The fallback is always `en` (English, US) and is not a field.
+#
+#   direction     "ltr" or "rtl": the page's `dir` for that language.
+#   scripts       the scripts its text needs, for the fonts: latin, latin-ext, cyrillic,
+#                 devanagari, cjk, arabic, hebrew.
+#   languagetool  its LanguageTool language code (scripts/check_text.py); left out, its texts
+#                 are skipped.
+#   vale          the Vale styles for its UI strings (scripts/vale.sh); left out, they are skipped.
+#   reviewed      true when the author reviews it; false for machine-translated languages.
+
+[locales.en]
+direction = "ltr"
+scripts = ["latin"]
+languagetool = "en-US"
+vale = ["ChessTrainer"]
+reviewed = true
+
+[locales.pt-BR]
+direction = "ltr"
+scripts = ["latin"]
+languagetool = "pt-BR"
+vale = ["ChessTrainer", "PtBR", "UI"]
+reviewed = true
+
+[locales.es]
+direction = "ltr"
+scripts = ["latin"]
+languagetool = "es"
+vale = ["ChessTrainer", "Es", "UI"]
+reviewed = true
