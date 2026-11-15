@@ -45,6 +45,22 @@ tested.
 - Third-party assets must be compatible with GPL-3.0 and listed in
   [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
+## Translations
+
+What differs per language is data, described in
+[docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md) §8:
+
+- `i18n/locales.toml`, the locale registry: direction, scripts, LanguageTool code, Vale styles
+  and whether the author reviews the language. Every `web/i18n/{locale}.json` has an entry there.
+- `i18n/glossary/{locale}.toml`: the chess terms of that language, each with the Wikipedia or
+  Wikidata page it came from, or `machine = true` when none has it.
+- `i18n/names/{locale}.toml`: where each localized opening name in `openings/` came from: a
+  Wikipedia or Wikidata page, the glossary (`rule = true`) or machine translation
+  (`machine = true`).
+
+Look up a chess term or an opening name in that language's Wikipedia first, and translate by
+machine only what it does not have. The fallback is always English (US).
+
 ## Pull requests
 
 Keep them small, one subject each, with small commits. Describe what changed and how to test it.
