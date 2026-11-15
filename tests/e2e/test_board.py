@@ -682,6 +682,26 @@ def test_check_sounds_after_capture_and_the_clock_only_in_timed_games(page: Page
     ]
 
 
+def test_the_clock_is_not_pressed_after_the_move_that_ends_the_game(page: Page, seed_prefs):
+    """The clock is not pressed after the move that ends the game.
+
+    Args:
+        page (Page): A fresh page at 1280x720; an uncaught page error fails the test.
+        seed_prefs (Callable[..., None]): Stores setup preferences before the page loads.
+    """
+    page.add_init_script(RECORD_SOUNDS)
+    seed_prefs(["1. e4 c6 2. d4 d5 3. e5 Bf5 4. Nf3"], color="black", timeControl="3i2")
+    fake_api(page, [("f2f3", "f3"), ("g2g4", "g4")], first_bot_move=True)
+    page.goto("/")
+    play(page)
+    wait_for_your_move(page)
+    click_move(page, "e7", "e5")
+    wait_for_your_move(page)
+    click_move(page, "d8", "h4")  # mate
+    page.locator("#end-card").wait_for(state="visible")
+    assert sounds(page)[-4:] == ["move-bot", "clock-bot", "check", "end"]
+
+
 def test_move_sound_follows_castling_capture_check(page: Page):
     """Move sound follows castling, then capture, then check.
 
