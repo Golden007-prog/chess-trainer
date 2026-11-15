@@ -2,8 +2,10 @@
 
 Sends `docs/*.md`, `HOW_TO_INSTALL*.md`, `README*.md` and every string of `web/i18n/*.json`
 through LanguageTool's HTTP API, each in its own language, and fails on any match that
-`scripts/text_check.toml` does not allow. Words of the book's opening names are always allowed,
-and so are SAN moves. Markdown code, links' targets, HTML and `{placeholders}` are not checked.
+`scripts/text_check.toml` does not allow. Each language's LanguageTool code comes from the
+locale registry, `i18n/locales.toml`; a language without one is skipped, not failed. Words of the
+book's opening names are always allowed, and so are SAN moves. Markdown code, links' targets,
+HTML and `{placeholders}` are not checked.
 
 Start the server first (`scripts/languagetool.sh`, which needs Java 17 or newer), then:
 
@@ -22,8 +24,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from app.locales import load_locales  # noqa: E402  (after the path to the repository)
+
 CONFIG = ROOT / "scripts" / "text_check.toml"
-LT_LANG = {"en": "en-US", "pt-BR": "pt-BR", "es": "es"}
+VALE_CONFIG = ROOT / ".vale.ini"
+LOCALES = load_locales()
+LT_LANG = {code: locale.languagetool for code, locale in LOCALES.items() if locale.languagetool}
 # Headings that start another language inside an English README.
 README_SECTIONS = {"## Português (Brasil)": "pt-BR", "## Español": "es"}
 SAN = re.compile(r"^(?:O-O(?:-O)?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?)[+#]?[!?]*$")
@@ -123,7 +130,7 @@ def locale_of(path: Path) -> str:
         The locale code; English when the name has none.
     """
     suffix = path.name.split(".")[-2] if path.name.count(".") > 1 else "en"
-    return suffix if suffix in LT_LANG else "en"
+    return suffix if suffix in LOCALES else "en"
 
 
 def markdown_texts(path: Path) -> list[Text]:
@@ -248,15 +255,26 @@ def export(folder: Path) -> None:
     """Writes the texts Vale cannot read by itself as Markdown files, one per language.
 
     The UI strings go to `ui.{locale}.md`, one line each, after their key in backticks and with
-    their placeholders as code. The
-    pt-BR and es sections of the README go to `README.{locale}.md`, on the same line numbers as
-    in the README.
+    their placeholders as code, for every language with Vale styles in the locale registry;
+    the others are skipped. The pt-BR and es sections of the README go to `README.{locale}.md`,
+    on the same line numbers as in the README. `vale.ini` is `.vale.ini` plus a section per
+    exported UI file with that language's styles.
 
     Args:
         folder: Where to write them; it is created if needed.
     """
     folder.mkdir(parents=True, exist_ok=True)
+    config = VALE_CONFIG.read_text(encoding="utf-8").replace(
+        "StylesPath = .vale/styles",
+        f"StylesPath = {os.path.relpath(ROOT / '.vale' / 'styles', folder)}",
+    )
     for path in sorted((ROOT / "web" / "i18n").glob("*.json")):
+        locale = LOCALES.get(path.stem)
+        if locale is None or not locale.vale:
+            print(f"Vale: skipped {path.stem}, no Vale styles in i18n/locales.toml")
+            continue
+        rel = (folder / f"ui.{path.stem}.md").resolve().relative_to(ROOT)
+        config += f"\n[{rel}]\nBasedOnStyles = {', '.join(locale.vale)}\n"
         strings: dict[str, str] = json.loads(path.read_text(encoding="utf-8"))
         lines = [
             f"`{key}` {PLACEHOLDER.sub(lambda m: f'`{m.group()}`', value)}\n"
@@ -268,6 +286,7 @@ def export(folder: Path) -> None:
             body = "".join(c for _, c, _ in text.parts)
             padded = "\n" * (text.first_line - 1) + body
             (folder / f"README.{text.lang}.md").write_text(padded, encoding="utf-8")
+    (folder / "vale.ini").write_text(config, encoding="utf-8")
 
 
 def main() -> int:
@@ -289,6 +308,7 @@ def main() -> int:
     config = tomllib.loads(CONFIG.read_text(encoding="utf-8"))
     common = book_words() | set(config["allow"]["all"])
     words = {lang: common | set(config["allow"].get(lang, [])) for lang in LT_LANG}
+    skipped: set[str] = set()
     files = args.paths or sorted(
         {
             *ROOT.glob("docs/*.md"),
@@ -302,6 +322,11 @@ def main() -> int:
         path = path.resolve()
         texts = i18n_texts(path) if path.suffix == ".json" else markdown_texts(path)
         for text in texts:
+            if text.lang not in LT_LANG:
+                if text.lang not in skipped:
+                    print(f"Skipped {text.lang}: no LanguageTool code in i18n/locales.toml")
+                    skipped.add(text.lang)
+                continue
             whole = "".join(c for _, c, _ in text.parts)
             utf16 = whole.encode("utf-16-le")  # LanguageTool counts offsets in UTF-16 units
             for match in check(args.url, text):
