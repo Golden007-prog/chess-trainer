@@ -21,6 +21,7 @@ if not STOCKFISH.exists():
 datas = [
     (str(ROOT / "web"), "web"),
     (str(ROOT / "openings"), "openings"),
+    (str(ROOT / "i18n" / "locales.toml"), "i18n"),
     (str(ROOT / "catalog" / "data"), "catalog/data"),
     (str(ROOT / "catalog" / "SOURCE_COMMIT"), "catalog"),
     (str(ROOT / "evals"), "evals"),

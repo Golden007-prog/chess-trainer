@@ -17,6 +17,7 @@ class Settings:
         book_evals_file (Path): The book evaluations, `evals/book.json`.
         database_path (Path): The DuckDB file.
         web_dir (Path): The frontend served at `/`.
+        locales_file (Path): The locale registry, `i18n/locales.toml`.
         levels_file (Path): The bot strength levels (TOML).
         stockfish_path (str): The Stockfish binary, a path or a name on `PATH`.
         stockfish_version_file (Path): The `VERSION` file written by the image build.
@@ -32,6 +33,7 @@ class Settings:
     book_evals_file: Path = ROOT / "evals" / "book.json"
     database_path: Path = ROOT / "data" / "chess-trainer.duckdb"
     web_dir: Path = ROOT / "web"
+    locales_file: Path = ROOT / "i18n" / "locales.toml"
     levels_file: Path = Path(__file__).parent / "engine" / "levels.toml"
     stockfish_path: str = "stockfish"
     stockfish_version_file: Path = Path("/opt/stockfish/VERSION")
@@ -53,6 +55,7 @@ def settings_from_env() -> Settings:
         book_evals_file=Path(os.environ.get("CHESS_TRAINER_BOOK_EVALS", defaults.book_evals_file)),
         database_path=Path(os.environ.get("CHESS_TRAINER_DB", defaults.database_path)),
         web_dir=Path(os.environ.get("CHESS_TRAINER_WEB_DIR", defaults.web_dir)),
+        locales_file=Path(os.environ.get("CHESS_TRAINER_LOCALES_FILE", defaults.locales_file)),
         levels_file=Path(os.environ.get("CHESS_TRAINER_LEVELS_FILE", defaults.levels_file)),
         stockfish_path=os.environ.get("STOCKFISH_PATH", defaults.stockfish_path),
         stockfish_version_file=Path(

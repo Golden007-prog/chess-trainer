@@ -1,6 +1,9 @@
 """Checks every line in openings/: legal moves, and ECO and name against the catalog.
 
-A line without an `opening` is ours (extended or imported) and only has to be legal.
+A line without an `opening` is ours (extended or imported) and only has to be legal. Also checks
+the glossaries and the sources of opening names (`i18n/`), and reports, for each locale of the
+registry, how many names it has and how many are sourced, rule-built, machine-translated or not
+recorded yet.
 Usage: uv run python -m catalog.validate [OPENINGS_DIR]
 """
 
@@ -9,9 +12,18 @@ import sys
 from pathlib import Path
 
 from app.book.source import BookError, OpeningFile, read_opening_files, replay
+from app.locales import DEFAULT_LOCALE, load_locales
 from catalog.loader import index_by_position, load_catalog
+from catalog.translations import (
+    NAMES_DIR,
+    TranslationError,
+    glossary_problems,
+    load_name_sources,
+    localized_names,
+    name_origins,
+    name_source_problems,
+)
 
-LOCALES = ("en", "pt-BR", "es")
 DEFAULT_DIR = Path(__file__).parent.parent / "openings"
 
 
@@ -69,8 +81,43 @@ def name_coverage(files: list[OpeningFile]) -> dict[str, dict[str, tuple[int, in
             "subgroups": (sum(locale in n for n in subgroup_names), len(subgroup_names)),
             "lines": (sum(locale in n for n in line_names), len(line_names)),
         }
-        for locale in LOCALES
+        for locale in load_locales()
     }
+
+
+def translation_report(files: list[OpeningFile], names_dir: Path = NAMES_DIR) -> list[str]:
+    """Checks the name sources of each locale and says where its names came from.
+
+    Args:
+        files (list[OpeningFile]): The opening files.
+        names_dir (Path): The `i18n/names` folder.
+
+    Returns:
+        list[str]: One line per locale other than English, then one `INVALID:` line per problem.
+            Subgroups count once per family, as their sources are recorded.
+    """
+    report: list[str] = []
+    problems: list[str] = []
+    for locale in load_locales():
+        if locale == DEFAULT_LOCALE:
+            continue
+        names = localized_names(files, locale)
+        path = names_dir / f"{locale}.toml"
+        sources = {}
+        if path.exists():
+            try:
+                sources = load_name_sources(path)
+            except TranslationError as error:
+                problems.append(str(error))
+            problems += name_source_problems(names, sources, locale)
+        counts = name_origins(names, sources)
+        total = max(len(names), 1)
+        report.append(
+            f"sources {locale}: {len(names)} names, "
+            + ", ".join(f"{origin} {n} ({n / total:.0%})" for origin, n in counts.items())
+            + ("" if path.exists() else f" (no {path.name} yet)")
+        )
+    return report + [f"INVALID: {problem}" for problem in problems + glossary_problems()]
 
 
 def main(directory: Path) -> int:
@@ -98,7 +145,11 @@ def main(directory: Path) -> int:
             for kind, (done, all_) in kinds.items()
         )
         print(f"names {locale}: {report}")
-    return 1 if problems else 0
+    translations = translation_report(files)
+    for line in translations:
+        print(line, file=sys.stderr if line.startswith("INVALID") else sys.stdout)
+    invalid = any(line.startswith("INVALID") for line in translations)
+    return 1 if problems or invalid else 0
 
 
 if __name__ == "__main__":

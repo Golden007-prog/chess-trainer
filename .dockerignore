@@ -3,6 +3,7 @@
 !web/
 !catalog/
 !openings/
+!i18n/locales.toml
 !evals/book.json
 !docker/
 !pyproject.toml

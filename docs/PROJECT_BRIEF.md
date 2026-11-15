@@ -103,6 +103,7 @@ chess-trainer/
 ├── openings/              # the book: one JSON per opening family (§6)
 ├── evals/                 # book.json: Stockfish's evaluation of every book position (§6)
 ├── catalog/               # pinned Lichess catalog, reference only: seed and validation (§6)
+├── i18n/                  # locale registry, glossaries and sources of opening names (§8), not served
 ├── data/                  # chess-trainer.duckdb, bind-mounted, not versioned (§7)
 ├── web/
 │   ├── index.html
@@ -252,7 +253,42 @@ Rules:
 - The name of a position (the Lichess catalog's, in English: during a game, on the end-of-game card, in reviews and saved games) is shown in the chosen language. Every catalog name is the `opening` of a book line and reads as its family's name, a separator and the line's name, so the browser rebuilds it from their translations. An untranslated line keeps its English name after the translated family; a name that does not split that way stays in English. PGN `Opening` tags stay in English.
 - Default locale `en`, switchable with a language picker beside the logo, at the top of the left bar, and kept per browser, like the other UI preferences. Switching redraws the page in place, mid-game included; a key a language lacks falls back to English. The picker lists every file in `web/i18n`, each named by its own `locale.name` key.
 - Move notation: **always English SAN**, in every language (PGN, Chess.com and Lichess standard). Possible future option: figurine notation.
-- Adding a language = one UI file in `web/i18n` plus that locale in the `names` of the `openings/` files, no code changes. UI files exist for `en`, `pt-BR` and `es`; the pt-BR and es files were reviewed on 2026-11-09.
+- Adding a language = one UI file in `web/i18n`, its entry in the locale registry, its glossary, and that locale in the `names` of the `openings/` files with their sources, no code changes. UI files exist for `en`, `pt-BR` and `es`; the pt-BR and es files were reviewed on 2026-11-09.
+- The fallback is always `en` (English, US), for every language, with no chain between languages (`pt-PT` does not fall back to `pt-BR`). It is fixed in the code, not a registry field.
+
+**Locale registry** (`i18n/locales.toml`, outside `web/`, so it is not served, but it ships with the app). One table per locale, `[locales.<code>]`, with what differs per language as parameters:
+- `direction`: `ltr` or `rtl`. `/api/locales` returns it as each locale's `dir`.
+- `scripts`: the scripts its text needs, for the fonts: `latin`, `latin-ext`, `cyrillic`, `devanagari`, `cjk`, `arabic`, `hebrew`.
+- `languagetool`: its LanguageTool code for `scripts/check_text.py`. Left out, the language is skipped, not failed.
+- `vale`: the Vale styles for its UI strings in `scripts/vale.sh`, such as `["ChessTrainer", "PtBR", "UI"]`. Left out, the language is skipped.
+- `reviewed`: true when the author reviews it (`en`, `pt-BR`, `es`); false for a machine-translated language.
+
+A test fails when a `web/i18n` file has no entry, or an entry has no file. The app does not start with a bad registry.
+
+**Glossary** (`i18n/glossary/{locale}.toml`): one `[[terms]]` row per chess term the UI uses (check, checkmate, castling, piece names, opening, variation, gambit, defense, accepted, declined and so on), with `term` (the English term), `translation`, and either `source` (the Wikipedia or Wikidata page it came from) or `machine = true` when no page has it, plus an optional `note` for a choice that was made. Every glossary has the same terms as `en.toml`. The UI strings and the rule-built opening names of a language use its glossary terms.
+
+```toml
+[[terms]]
+term = "check"
+translation = "xeque"
+source = "https://pt.wikipedia.org/wiki/Xeque"
+```
+
+**Sources of opening names** (`i18n/names/{locale}.toml`): the names stay in the `names` of the `openings/` files (§6); this file records where each one of that locale came from. Families are keyed by id, subgroups by family id and English name, lines by line id. Each entry has the `name` it was recorded for and exactly one origin: `source` (a Wikipedia or Wikidata page), `rule = true` (built from the glossary, segment by segment, §6) or `machine = true`, plus an optional `note`. A test fails when a locale with this file has a name without an entry, an entry whose name changed, or an entry for something the book does not have. `catalog/validate.py` reports, per locale, how many names are sourced, rule-built, machine-translated or not recorded yet.
+
+```toml
+[families.caro-kann-defense]
+name = "Defesa Caro-Kann"
+source = "https://pt.wikipedia.org/wiki/Defesa_Caro-Kann"
+
+[subgroups.caro-kann-defense."Advance Variation"]
+name = "Variação do Avanço"
+rule = true
+
+[lines.line-3f2a9c10b7d4e681]
+name = "Variação do Avanço, Variação Curta"
+machine = true
+```
 
 ## 9. Engine
 

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from app.locales import load_locales
+
 I18N_DIR = Path(__file__).parent.parent.parent / "web" / "i18n"
 PLURAL_FORMS = ("zero", "one", "two", "few", "many", "other")
 PLACEHOLDER = re.compile(r"\{(\w+)\}")
@@ -122,3 +124,5 @@ def test_locales_endpoint_lists_the_files_english_first(client):
     assert names["pt-BR"] == "Português (Brasil)"
     assert names["es"] == "Español"
     assert body["default"] == "en"
+    registry = load_locales()
+    assert all(item["dir"] == registry[item["code"]].direction for item in body["locales"])

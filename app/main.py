@@ -26,6 +26,7 @@ from app.engine.process import MoveEngine, StockfishEngine
 from app.game.remote import fetch_url
 from app.game.service import GameService
 from app.game.store import GameStore
+from app.locales import load_locales
 
 
 class WebFiles(StaticFiles):
@@ -58,7 +59,8 @@ def create_app(
 ) -> FastAPI:
     """Builds the app: opens the database, loads the book and wires the services.
 
-    Fails loudly, so the app does not start, on a bad database, opening file or levels file.
+    Fails loudly, so the app does not start, on a bad database, opening file, levels file or
+    locale registry.
 
     Args:
         settings (Settings | None): Where the files are; read from the environment when None.
@@ -78,6 +80,7 @@ def create_app(
     book = load_book(database)
     opening_names = load_opening_names(database)
     levels = load_levels(settings.levels_file)
+    locales = load_locales(settings.locales_file)
     deviation_max_loss_cp = load_deviation_max_loss(settings.levels_file)
     engine = engine or StockfishEngine(
         settings.stockfish_path,
@@ -111,6 +114,7 @@ def create_app(
     app.state.levels = levels
     app.state.fetch_url = fetch_url
     app.state.i18n_dir = settings.web_dir / "i18n"
+    app.state.locales = locales
     app.include_router(router)
     app.mount("/", WebFiles(directory=settings.web_dir, html=True), name="web")
     return app
