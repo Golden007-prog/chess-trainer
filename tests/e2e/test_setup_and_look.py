@@ -786,9 +786,13 @@ def test_fonts_are_the_vendored_ones(page: Page):
     """
     page.goto("/")
     page.locator(".square").first.wait_for()
-    page.evaluate("document.fonts.ready")
-    assert page.evaluate("document.fonts.check('16px \"Familjen Grotesk\"')")
-    assert page.evaluate("document.fonts.check('16px \"JetBrains Mono\"')")
+    # fonts.ready can resolve before a font starts loading, so ask for each one.
+    for family in ("Familjen Grotesk", "JetBrains Mono"):
+        loaded = page.evaluate(
+            'async (family) => (await document.fonts.load(`16px "${family}"`)).length', family
+        )
+        assert loaded > 0, family
+        assert page.evaluate('(family) => document.fonts.check(`16px "${family}"`)', family)
 
 
 def test_logo_is_in_the_header_and_the_browser_tab(page: Page):
@@ -817,7 +821,7 @@ def test_footer_shows_the_engine_version(page: Page):
         page (Page): A fresh page at 1280x720; an uncaught page error fails the test.
     """
     page.goto("/")
-    expect(page.locator("#footer-versions")).to_contain_text("Chess Trainer 0.5.0")
+    expect(page.locator("#footer-versions")).to_contain_text("Chess Trainer 0.6.0")
     expect(page.locator("#footer-versions")).to_contain_text("Stockfish")
 
 

@@ -4,7 +4,7 @@ import random
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -26,6 +26,29 @@ from app.engine.process import MoveEngine, StockfishEngine
 from app.game.remote import fetch_url
 from app.game.service import GameService
 from app.game.store import GameStore
+
+
+class WebFiles(StaticFiles):
+    """Serves web/, telling the browser to check each file before using its cached copy.
+
+    Without a Cache-Control header a browser keeps files for a time of its own choosing, so after
+    an update it can mix new and old JS and CSS. `no-cache` still uses the cache: an unchanged file
+    is answered with 304 from its ETag.
+    """
+
+    def file_response(self, *args: object, **kwargs: object) -> Response:
+        """Serves a file, or a 304, with `Cache-Control: no-cache`.
+
+        Args:
+            *args (object): StaticFiles.file_response's arguments.
+            **kwargs (object): StaticFiles.file_response's keyword arguments.
+
+        Returns:
+            Response: The file or the 304 answer.
+        """
+        response = super().file_response(*args, **kwargs)  # type: ignore[arg-type]
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def create_app(
@@ -89,5 +112,5 @@ def create_app(
     app.state.fetch_url = fetch_url
     app.state.i18n_dir = settings.web_dir / "i18n"
     app.include_router(router)
-    app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")
+    app.mount("/", WebFiles(directory=settings.web_dir, html=True), name="web")
     return app

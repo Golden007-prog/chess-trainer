@@ -59,6 +59,22 @@ def test_health_reports_engine(client):
     assert body["engine"] == {"name": "Fake Engine 1", "build_tag": "fake"}
 
 
+def test_web_files_are_checked_before_their_cached_copy_is_used(client):
+    """The page and its files tell the browser to check them, so an update never mixes versions.
+
+    Args:
+        client (TestClient): The API on a fresh copy of the database, with the fake engine.
+    """
+    for path in ("/", "/js/review.js", "/css/board.css", "/sounds/move.wav"):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        assert response.headers["cache-control"] == "no-cache", path
+    etag = client.get("/js/review.js").headers["etag"]
+    again = client.get("/js/review.js", headers={"If-None-Match": etag})
+    assert again.status_code == 304
+    assert again.headers["cache-control"] == "no-cache"
+
+
 def test_refuses_an_unknown_host(client):
     """A request for another name is refused, so DNS rebinding cannot reach the app.
 

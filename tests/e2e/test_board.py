@@ -9,7 +9,15 @@ import re
 
 from playwright.sync_api import Page, expect
 
-from tests.e2e.conftest import click_move, moves_text, play, square, wait_for_your_move
+from tests.e2e.conftest import (
+    RECORD_SOUNDS,
+    click_move,
+    moves_text,
+    play,
+    sounds,
+    square,
+    wait_for_your_move,
+)
 
 
 def fake_api(
@@ -341,6 +349,24 @@ def test_board_flips_to_the_users_color_with_coordinates(page: Page, seed_prefs)
     expect(page.locator(".coord-file")).to_have_text(list("abcdefgh"))
     expect(square(page, "a1").locator(".coord-rank")).to_have_text("1")
     expect(square(page, "a1").locator(".coord-file")).to_have_text("a")
+    outside = page.evaluate(
+        """() => {
+          const board = document.getElementById("board").getBoundingClientRect();
+          const rank = document.querySelector(".coord-rank").getBoundingClientRect();
+          const file = document.querySelector(".coord-file").getBoundingClientRect();
+          const rankFar = document.querySelector(".coord-rank-far").getBoundingClientRect();
+          const fileFar = document.querySelector(".coord-file-far").getBoundingClientRect();
+          return (
+            rank.right <= board.left &&
+            file.top >= board.bottom &&
+            rankFar.left >= board.right &&
+            fileFar.bottom <= board.top
+          );
+        }"""
+    )
+    assert outside  # on the frame around the board, not on the squares
+    expect(page.locator(".coord-rank-far")).to_have_text([str(n) for n in range(8, 0, -1)])
+    expect(page.locator(".coord-file-far")).to_have_text(list("abcdefgh"))
 
     page.locator('input[name="color"][value="black"]').check()
     expect(first).to_have_attribute("data-square", "h1")
@@ -572,27 +598,6 @@ def test_premove_destinations_by_shape(page: Page):
     assert result["queen"] == 27
 
 
-RECORD_SOUNDS = """
-window.sounds = [];
-document.addEventListener("chess-trainer:sound", (event) => window.sounds.push(event.detail));
-"""
-
-
-def sounds(page: Page) -> list[str]:
-    """The sounds the page has played, recorded by a test hook.
-
-    Args:
-        page (Page): The page.
-
-    Returns:
-        list[str]: Each sound's type, with `-bot` for the bot's moves.
-    """
-    return [
-        f"{item['type']}{'-bot' if item['byBot'] else ''}"
-        for item in page.evaluate("window.sounds")
-    ]
-
-
 def test_each_event_plays_its_sound(page: Page, seed_prefs):
     """Each event plays its sound.
 
@@ -639,6 +644,79 @@ def test_each_event_plays_its_sound(page: Page, seed_prefs):
         "castle",
         "move-bot",
     ]
+
+
+def test_check_sounds_after_capture_and_the_clock_only_in_timed_games(page: Page, seed_prefs):
+    """Check sounds after capture, and the clock is pressed only in timed games.
+
+    Args:
+        page (Page): A fresh page at 1280x720; an uncaught page error fails the test.
+        seed_prefs (Callable[..., None]): Stores setup preferences before the page loads.
+    """
+    page.add_init_script(RECORD_SOUNDS)
+    seed_prefs(["1. e4 c5 2. c3"], color="white", timeControl="3i2")
+    fake_api(page, [("d7d5", "d5"), ("c7c6", "c6"), ("b7c6", "bxc6")])
+    page.goto("/")
+    play(page)
+    wait_for_your_move(page)
+    click_move(page, "e2", "e4")
+    wait_for_your_move(page)
+    click_move(page, "f1", "b5")  # check
+    wait_for_your_move(page)
+    click_move(page, "b5", "c6")  # capture with check: the capture sounds
+    wait_for_your_move(page)
+    assert sounds(page) == [
+        "start",
+        "move",
+        "clock",
+        "move-bot",
+        "clock-bot",
+        "check",
+        "clock",
+        "move-bot",
+        "clock-bot",
+        "capture",
+        "clock",
+        "capture-bot",
+        "clock-bot",
+    ]
+
+
+def test_the_clock_is_not_pressed_after_the_move_that_ends_the_game(page: Page, seed_prefs):
+    """The clock is not pressed after the move that ends the game.
+
+    Args:
+        page (Page): A fresh page at 1280x720; an uncaught page error fails the test.
+        seed_prefs (Callable[..., None]): Stores setup preferences before the page loads.
+    """
+    page.add_init_script(RECORD_SOUNDS)
+    seed_prefs(["1. e4 c6 2. d4 d5 3. e5 Bf5 4. Nf3"], color="black", timeControl="3i2")
+    fake_api(page, [("f2f3", "f3"), ("g2g4", "g4")], first_bot_move=True)
+    page.goto("/")
+    play(page)
+    wait_for_your_move(page)
+    click_move(page, "e7", "e5")
+    wait_for_your_move(page)
+    click_move(page, "d8", "h4")  # mate
+    page.locator("#end-card").wait_for(state="visible")
+    assert sounds(page)[-4:] == ["move-bot", "clock-bot", "check", "end"]
+
+
+def test_move_sound_follows_castling_capture_check(page: Page):
+    """Move sound follows castling, then capture, then check.
+
+    Args:
+        page (Page): A fresh page at 1280x720; an uncaught page error fails the test.
+    """
+    page.goto("/")
+    page.locator(".square").first.wait_for()
+    result = page.evaluate(
+        """async () => {
+          const { moveSound } = await import("/js/sound.js");
+          return ["e4", "Nf3", "Qh5+", "Qxf7#", "Bxc6+", "exd8=Q", "O-O", "O-O-O+"].map(moveSound);
+        }"""
+    )
+    assert result == ["move", "move", "check", "capture", "capture", "capture", "castle", "castle"]
 
 
 def test_bot_capture_and_castling_sound_like_the_bots(page: Page, seed_prefs):
@@ -724,8 +802,8 @@ def test_volume_is_kept(page: Page):
     expect(page.locator("#sound-volume")).to_have_value("0.3")
 
 
-def test_generated_sounds_are_audible_and_different(page: Page):
-    """Generated sounds are audible and different.
+def test_recorded_sounds_load_and_the_bots_play_lower(page: Page):
+    """Recorded sounds load, and the bot's play lower.
 
     Args:
         page (Page): A fresh page at 1280x720; an uncaught page error fails the test.
@@ -734,35 +812,28 @@ def test_generated_sounds_are_audible_and_different(page: Page):
     page.locator(".square").first.wait_for()
     result = page.evaluate(
         """async () => {
-          const { scheduleSound } = await import("/js/sound.js");
+          const { SOUND_TYPES, loadSounds, scheduleSound } = await import("/js/sound.js");
+          const buffers = await loadSounds(new OfflineAudioContext(1, 1, 44100));
           const render = async (type, byBot = false) => {
             const context = new OfflineAudioContext(1, 44100, 44100);
-            scheduleSound(context, context.destination, type, 0, byBot);
+            scheduleSound(context, context.destination, buffers.get(type), 0, byBot);
             const samples = (await context.startRendering()).getChannelData(0);
-            let peak = 0, last = 0, energy = 0, crossings = 0;
+            let peak = 0, last = 0;
             for (let i = 0; i < samples.length; i += 1) {
               const value = Math.abs(samples[i]);
               if (value > peak) peak = value;
               if (value > 0.001) last = i;
-              energy += samples[i] * samples[i];
-              // Just after the click and before a second knock: this window shows the pitch.
-              if (i > 900 && i < 2500 && samples[i - 1] * samples[i] < 0) crossings += 1;
             }
-            return { peak, seconds: last / 44100, energy, crossings };
+            return { peak, seconds: last / 44100 };
           };
-          const out = {};
-          for (const type of ["move", "capture", "castle", "start", "end"]) {
-            out[type] = await render(type);
-          }
+          const out = { loaded: [...buffers.keys()].sort(), types: [...SOUND_TYPES].sort() };
+          for (const type of SOUND_TYPES) out[type] = await render(type);
           out.bot = await render("move", true);
           return out;
         }"""
     )
+    assert result.pop("loaded") == result.pop("types")
     for name, item in result.items():
         assert item["peak"] > 0.05, name
-        assert item["seconds"] < 0.8, name
-    assert result["capture"]["energy"] > result["move"]["energy"]
-    assert result["capture"]["crossings"] < result["move"]["crossings"]  # lower pitch
-    assert result["castle"]["seconds"] > result["move"]["seconds"]  # two knocks
-    assert result["bot"]["crossings"] < result["move"]["crossings"]
-    assert result["end"]["seconds"] > result["start"]["seconds"]
+        assert 0.05 < item["seconds"] < 1, name
+    assert result["bot"]["seconds"] > result["move"]["seconds"]  # slower, so lower

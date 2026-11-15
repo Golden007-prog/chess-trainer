@@ -5,8 +5,7 @@
   grid-template-rows: repeat(8, 1fr);
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 4px;
-  overflow: hidden;
+  /* No overflow: hidden, so the coordinates can sit outside; the corner squares are rounded. */
   /* Lets a finger drag a piece without scrolling the page. */
   touch-action: none;
   user-select: none;
@@ -17,6 +16,22 @@
   position: relative;
   min-width: 0;
   min-height: 0;
+}
+
+.square:nth-child(1) {
+  border-top-left-radius: 4px;
+}
+
+.square:nth-child(8) {
+  border-top-right-radius: 4px;
+}
+
+.square:nth-child(57) {
+  border-bottom-left-radius: 4px;
+}
+
+.square:nth-child(64) {
+  border-bottom-right-radius: 4px;
 }
 
 .square.light {
@@ -36,6 +51,7 @@
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
 }
 
 .square.last::before {
@@ -79,21 +95,47 @@
   z-index: 2;
 }
 
+/* Coordinates on the wooden frame, on all four sides; the files in capitals. */
 .coord {
   position: absolute;
-  z-index: 1;
-  font: 700 clamp(9px, 1.5vmin, 12px) / 1 var(--font-mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--board-frame-ink);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  font: 600 clamp(12px, calc(var(--square-size, 60px) * 0.24), 16px) / 1 var(--font-mono);
   pointer-events: none;
 }
 
+.coord-rank,
+.coord-rank-far {
+  top: 0;
+  bottom: 0;
+  width: var(--coord-gutter);
+}
+
 .coord-rank {
-  top: 4%;
-  left: 5%;
+  right: 100%;
+}
+
+.coord-rank-far {
+  left: 100%;
+}
+
+.coord-file,
+.coord-file-far {
+  left: 0;
+  right: 0;
+  height: var(--coord-gutter);
+  text-transform: uppercase;
 }
 
 .coord-file {
-  bottom: 4%;
-  right: 6%;
+  top: 100%;
+}
+
+.coord-file-far {
+  bottom: 100%;
 }
 
 .piece {

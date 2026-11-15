@@ -197,3 +197,24 @@ def moves_text(page: Page) -> list[str]:
     """
     cells = page.locator("#movelist .move").all_text_contents()
     return [cell for cell in cells if cell]
+
+
+RECORD_SOUNDS = """
+window.sounds = [];
+document.addEventListener("chess-trainer:sound", (event) => window.sounds.push(event.detail));
+"""
+
+
+def sounds(page: Page) -> list[str]:
+    """The sounds the page has played, recorded by a test hook.
+
+    Args:
+        page (Page): The page.
+
+    Returns:
+        list[str]: Each sound's type, with `-bot` for the bot's moves.
+    """
+    return [
+        f"{item['type']}{'-bot' if item['byBot'] else ''}"
+        for item in page.evaluate("window.sounds")
+    ]

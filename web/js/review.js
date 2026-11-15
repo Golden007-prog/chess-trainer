@@ -7,6 +7,7 @@ import { formatClock } from "./clock.js";
 import { linkMoves, renderReviewList } from "./reviewlist.js";
 import { levelLabel } from "./levels.js";
 import { openingName } from "./opening-names.js";
+import { sound } from "./sound.js";
 
 /**
  * Finds an element by id.
@@ -44,10 +45,10 @@ export class Review {
     this.hasClocks = false;
     this.evalBar = new EvalBar();
 
-    byId("review-first").addEventListener("click", () => this.goTo(FIRST));
+    byId("review-first").addEventListener("click", () => this.goTo(FIRST, true));
     byId("review-prev").addEventListener("click", () => this.back());
     byId("review-next").addEventListener("click", () => this.forward());
-    byId("review-last").addEventListener("click", () => this.goTo(this.lastPly));
+    byId("review-last").addEventListener("click", () => this.goTo(this.lastPly, true));
     byId("review-flip").addEventListener("click", () => this.flip());
     byId("review-close").addEventListener("click", () => this.close());
     byId("review-play").addEventListener("click", () => {
@@ -59,7 +60,7 @@ export class Review {
     byId("movelist").addEventListener("click", (/** @type {any} */ event) => {
       if (!this.active) return;
       const cell = event.target.closest?.("[data-node]");
-      if (cell) this.select(this.nodes[Number(cell.dataset.node)] ?? null);
+      if (cell) this.select(this.nodes[Number(cell.dataset.node)] ?? null, true);
     });
     document.addEventListener("keydown", (event) => this.onKey(event));
   }
@@ -161,32 +162,36 @@ export class Review {
   /**
    * Shows a move of the main line.
    * @param {number} ply  A move of the main line, 0 for the start; clamped to the game.
+   * @param {boolean} [audible]  Plays the move's sound: the user moved through the game.
    * @returns {void}
    */
-  goTo(ply) {
+  goTo(ply, audible = false) {
     if (!this.active) return;
     const clamped = Math.min(this.lastPly, Math.max(FIRST, ply));
-    this.select(clamped === FIRST ? null : this.data.moves[clamped - 1]);
+    this.select(clamped === FIRST ? null : this.data.moves[clamped - 1], audible);
   }
 
   /** Shows the move before, in the line being followed. */
   back() {
-    if (this.node) this.select(this.node.prev);
+    if (this.node) this.select(this.node.prev, true);
   }
 
   /** Shows the move after, in the line being followed. */
   forward() {
     const next = this.node ? this.node.next : (this.data?.moves[0] ?? null);
-    if (next) this.select(next);
+    if (next) this.select(next, true);
   }
 
   /**
    * Shows the position after a move, and updates the list, clocks, bar and buttons.
    * @param {import("./reviewlist.js").ReviewMove | null} node  The move, or null for the start.
+   * @param {boolean} [audible]  Plays the move's sound: the user moved through the game. A review
+   *   has no clock sound and no bot.
    * @returns {void}
    */
-  select(node) {
+  select(node, audible = false) {
     if (!this.active) return;
+    if (audible && node && node !== this.node) sound.playMove(node.san);
     this.node = node;
     this.ply = node ? node.ply : FIRST;
     const fen = node ? node.fen : this.data.start_fen;
@@ -248,8 +253,8 @@ export class Review {
     if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
     if (event.key === "ArrowLeft") this.back();
     else if (event.key === "ArrowRight") this.forward();
-    else if (event.key === "Home") this.goTo(FIRST);
-    else if (event.key === "End") this.goTo(this.lastPly);
+    else if (event.key === "Home") this.goTo(FIRST, true);
+    else if (event.key === "End") this.goTo(this.lastPly, true);
     else if (event.key === "Escape") this.close();
     else return;
     event.preventDefault();

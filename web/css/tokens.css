@@ -17,6 +17,11 @@
 
   --board-light: #eeeed2;
   --board-dark: #769656;
+  /* The wooden frame around the board, where the coordinates sit; the same in both themes. */
+  --board-frame: #8b5a2b;
+  --board-frame-light: #a8733f;
+  --board-frame-dark: #6e431d;
+  --board-frame-ink: #f3e3c3;
   --highlight-last: rgba(246, 246, 105, 0.55);
   --highlight-selected: rgba(246, 246, 105, 0.8);
   --highlight-premove: rgba(70, 120, 200, 0.6);

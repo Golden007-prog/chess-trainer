@@ -663,8 +663,8 @@
 
 .eval-bar {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: var(--coord-gutter);
+  bottom: var(--coord-gutter);
   left: -30px;
   width: 22px;
   overflow: hidden;
