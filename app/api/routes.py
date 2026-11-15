@@ -52,10 +52,9 @@ from app.game.session import (
     NothingToTakeBackError,
     NotYourTurnError,
 )
+from app.locales import DEFAULT_LOCALE
 
 router = APIRouter(prefix="/api")
-
-DEFAULT_LOCALE = "en"
 
 
 def _service(request: Request) -> GameService:
@@ -176,13 +175,14 @@ async def repertoires(request: Request) -> dict:
 async def locales(request: Request) -> dict:
     """`GET /api/locales`: the languages with a UI file in web/i18n, English first.
 
-    Each is named in its own language.
+    Each is named in its own language, with its text direction from the locale registry
+    (`ltr` when the registry has no entry for it).
 
     Args:
         request (Request): The HTTP request, for the app's state.
 
     Returns:
-        dict: `locales` (code and name) and the `default` code.
+        dict: `locales` (code, name and `dir`) and the `default` code.
     """
     found = []
     for path in sorted(request.app.state.i18n_dir.glob("*.json")):
@@ -190,7 +190,9 @@ async def locales(request: Request) -> dict:
             name = json.loads(path.read_text(encoding="utf-8")).get("locale.name", path.stem)
         except (OSError, ValueError):
             continue  # A broken file is left out; the frontend falls back to English.
-        found.append({"code": path.stem, "name": name})
+        entry = request.app.state.locales.get(path.stem)
+        direction = entry.direction if entry else "ltr"
+        found.append({"code": path.stem, "name": name, "dir": direction})
     found.sort(key=lambda item: (item["code"] != DEFAULT_LOCALE, item["code"]))
     return {"locales": found, "default": DEFAULT_LOCALE}
 
